@@ -1,12 +1,12 @@
 {
-  "name": "@nicetouch/react-three-test-renderer",
+  "name": "@react-three/test-renderer",
   "version": "9.0.0-alpha.0",
   "description": "Test Renderer for react-three-fiber",
   "author": "Josh Ellis",
   "license": "MIT",
-  "private": true,
-  "main": "dist/nicetouch-react-three-test-renderer.cjs.js",
-  "module": "dist/nicetouch-react-three-test-renderer.esm.js",
+  "private": false,
+  "main": "dist/react-three-test-renderer.cjs.js",
+  "module": "dist/react-three-test-renderer.esm.js",
   "types": "dist/react-three-test-renderer.cjs.d.ts",
   "bugs": {
     "url": "https://github.com/pmndrs/react-three-fiber/issues"
