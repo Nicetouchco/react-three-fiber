@@ -11,7 +11,7 @@ interface MathRepresentation {
 interface VectorRepresentation extends MathRepresentation {
   setScalar(s: number): any
 }
-type MathProps<P> = {
+type WithMathProps<P> = {
   [K in keyof P]: P[K] extends infer M
     ? M extends THREE.Color
       ? ConstructorParameters<typeof THREE.Color> | THREE.ColorRepresentation
@@ -35,11 +35,11 @@ interface ReactProps<P> {
 }
 
 type ElementProps<T extends ConstructorRepresentation, P = InstanceType<T>> = Partial<
-  Overwrite<P, ReactProps<P> & MathProps<P> & EventProps<P>>
+  Overwrite<WithMathProps<P>, ReactProps<P> & EventProps<P>>
 >
 
 export type ThreeElement<T extends ConstructorRepresentation> = Mutable<
-  Overwrite<ElementProps<T>, Omit<InstanceProps<InstanceType<T>>, 'object'>>
+  Overwrite<ElementProps<T>, Omit<InstanceProps<InstanceType<T>, T>, 'object'>>
 >
 
 type ThreeExports = typeof THREE
