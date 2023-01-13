@@ -24,7 +24,7 @@ export type Layers = MathType<THREE.Layers>
 export type Quaternion = MathType<THREE.Quaternion>
 export type Euler = MathType<THREE.Euler>
 
-type WithMathProps<P> = { [K in keyof P]: P[K] extends MathRepresentation ? MathType<P[K]> : P[K] }
+type WithMathProps<P> = { [K in keyof P]: P[K] extends MathRepresentation | THREE.Euler ? MathType<P[K]> : P[K] }
 
 interface RaycastableRepresentation {
   raycast(raycaster: THREE.Raycaster, intersects: THREE.Intersection[]): void
