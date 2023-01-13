@@ -5,13 +5,14 @@ import type { Mutable, Overwrite } from './core/utils'
 interface MathRepresentation {
   set(...args: number[]): any
 }
+
 interface VectorRepresentation extends MathRepresentation {
   setScalar(s: number): any
 }
 
-export type MathType<T extends MathRepresentation> = T extends THREE.Color
+export type MathType<T extends MathRepresentation | THREE.Euler> = T extends THREE.Color
   ? ConstructorParameters<typeof THREE.Color> | THREE.ColorRepresentation
-  : T extends VectorRepresentation | THREE.Layers
+  : T extends VectorRepresentation | THREE.Layers | THREE.Euler
   ? T | Parameters<T['set']> | number
   : T | Parameters<T['set']>
 
@@ -21,6 +22,7 @@ export type Vector4 = MathType<THREE.Vector4>
 export type Color = MathType<THREE.Color>
 export type Layers = MathType<THREE.Layers>
 export type Quaternion = MathType<THREE.Quaternion>
+export type Euler = MathType<THREE.Euler>
 
 type WithMathProps<P> = { [K in keyof P]: P[K] extends MathRepresentation ? MathType<P[K]> : P[K] }
 
