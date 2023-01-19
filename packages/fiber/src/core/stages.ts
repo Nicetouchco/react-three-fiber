@@ -42,10 +42,14 @@ export class Stage {
     this.subscribers.push({ ref, store })
 
     return () => {
-      this.subscribers = this.subscribers.filter((sub) => {
-        return sub.ref !== ref
-      })
+      this.remove(ref)
     }
+  }
+
+  remove(ref: UpdateSubscription['ref']) {
+    this.subscribers = this.subscribers.filter((sub) => {
+      return sub.ref !== ref
+    })
   }
 
   get frameTime() {
