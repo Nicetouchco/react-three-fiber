@@ -156,7 +156,6 @@ const createStages = (stages: Stage[] | undefined, store: RootStore) => {
       if (state.gl.render) state.gl.render(state.scene, state.camera)
     },
   }
-  renderApi.add(store)
 }
 
 export interface ReconcilerRoot<TCanvas extends Element> {
