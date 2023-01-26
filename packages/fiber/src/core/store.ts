@@ -337,8 +337,8 @@ export const createStore = (
           // because there could be multiple render subscriptions
           internal.priority = internal.priority + (priority > 0 ? 1 : 0)
           // We use the render flag and deprecate priority
-          if (internal.priority && state.internal.render === 'auto')
-            set(() => ({ internal: { ...state.internal, render: 'manual' } }))
+          // if (internal.priority && state.internal.render === 'auto')
+          //   set(() => ({ internal: { ...state.internal, render: 'manual' } }))
           internal.subscribers.push({ ref, priority, store })
           // Register subscriber and sort layers from lowest to highest, meaning,
           // highest priority renders last (on top of the other frames)
