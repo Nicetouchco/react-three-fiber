@@ -182,7 +182,7 @@ export function prepare<T = any>(target: T, root: RootStore, type: string, props
   const object = target as unknown as Instance['object']
 
   // Create instance descriptor
-  let instance = object.__r3f
+  let instance = object?.__r3f
   if (!instance) {
     instance = {
       root,
@@ -195,7 +195,7 @@ export function prepare<T = any>(target: T, root: RootStore, type: string, props
       handlers: {},
       isHidden: false,
     }
-    object.__r3f = instance
+    if (object) object.__r3f = instance
   }
 
   return instance
