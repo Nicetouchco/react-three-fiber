@@ -1,6 +1,6 @@
 {
   "name": "@nicetouch/react-three-fiber",
-  "version": "9.0.0-alpha.2--nt.9.3",
+  "version": "9.0.0-alpha.2--nt.9.4",
   "description": "A React renderer for Threejs",
   "keywords": [
     "react",
