@@ -96,15 +96,13 @@ function handleContainerEffects(parent: Instance, child: Instance, beforeChild?:
   if (!parent.parent && parent.object !== state.scene) return
 
   // Create & link object on first run
-  if (!child.object?.__r3f) {
-    if (!child.object) {
-      // Get target from catalogue
-      const name = `${child.type[0].toUpperCase()}${child.type.slice(1)}`
-      const target = catalogue[name]
+  if (!child.object) {
+    // Get target from catalogue
+    const name = `${child.type[0].toUpperCase()}${child.type.slice(1)}`
+    const target = catalogue[name]
 
-      // Create object
-      child.object = child.props.object ?? new target(...(child.props.args ?? []))
-    }
+    // Create object
+    child.object = child.props.object ?? new target(...(child.props.args ?? []))
     child.object.__r3f = child
 
     // Set initial props
@@ -248,15 +246,15 @@ function switchInstance(
   // This evil hack switches the react-internal fiber node
   // https://github.com/facebook/react/issues/14983
   // https://github.com/facebook/react/pull/15021
-  ;[fiber, fiber.alternate].forEach((fiber) => {
-    if (fiber !== null) {
-      fiber.stateNode = newInstance
-      if (fiber.ref) {
-        if (typeof fiber.ref === 'function') fiber.ref(newInstance.object)
-        else fiber.ref.current = newInstance.object
+  for (const _fiber of [fiber, fiber.alternate]) {
+    if (_fiber !== null) {
+      _fiber.stateNode = newInstance
+      if (_fiber.ref) {
+        if (typeof _fiber.ref === 'function') _fiber.ref(newInstance.object)
+        else _fiber.ref.current = newInstance.object
       }
     }
-  })
+  }
 
   // Tree was updated, request a frame
   invalidateInstance(newInstance)
