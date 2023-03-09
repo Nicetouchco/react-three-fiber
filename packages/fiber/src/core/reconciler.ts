@@ -2,7 +2,18 @@ import * as THREE from 'three'
 import Reconciler from 'react-reconciler'
 import { ContinuousEventPriority, DiscreteEventPriority, DefaultEventPriority } from 'react-reconciler/constants'
 import { unstable_IdlePriority as idlePriority, unstable_scheduleCallback as scheduleCallback } from 'scheduler'
-import { is, diffProps, applyProps, invalidateInstance, attach, detach, prepare, globalScope, now } from './utils'
+import {
+  is,
+  diffProps,
+  applyProps,
+  invalidateInstance,
+  attach,
+  detach,
+  prepare,
+  globalScope,
+  now,
+  isObject3D,
+} from './utils'
 import type { RootStore } from './store'
 import { removeInteractivity, type EventHandlers } from './events'
 
@@ -112,7 +123,7 @@ function handleContainerEffects(parent: Instance, child: Instance, beforeChild?:
   // Append instance
   if (child.props.attach) {
     attach(parent, child)
-  } else if (child.object instanceof THREE.Object3D && parent.object instanceof THREE.Object3D) {
+  } else if (isObject3D(child.object) && isObject3D(parent.object)) {
     if (beforeChild) {
       child.object.parent = parent.object
       parent.object.children.splice(parent.object.children.indexOf(beforeChild.object), replace ? 1 : 0, child.object)
@@ -176,7 +187,7 @@ function removeChild(
   // Eagerly tear down tree
   if (child.props.attach) {
     detach(parent, child)
-  } else if (child.object instanceof THREE.Object3D && parent.object instanceof THREE.Object3D) {
+  } else if (isObject3D(child.object) && isObject3D(parent.object)) {
     parent.object.remove(child.object)
     removeInteractivity(child.root, child.object)
   }
