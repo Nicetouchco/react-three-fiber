@@ -362,7 +362,7 @@ export const reconciler = Reconciler<
   hideInstance(instance) {
     if (instance.props.attach && instance.parent?.object) {
       detach(instance.parent, instance)
-    } else if (instance.object instanceof THREE.Object3D) {
+    } else if (isObject3D(instance.object)) {
       instance.object.visible = false
     }
 
@@ -373,7 +373,7 @@ export const reconciler = Reconciler<
     if (instance.isHidden) {
       if (instance.props.attach && instance.parent?.object) {
         attach(instance.parent, instance)
-      } else if (instance.object instanceof THREE.Object3D && instance.props.visible !== false) {
+      } else if (isObject3D(instance.object) && instance.props.visible !== false) {
         instance.object.visible = true
       }
     }
