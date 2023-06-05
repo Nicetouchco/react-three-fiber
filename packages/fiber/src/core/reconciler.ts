@@ -93,51 +93,37 @@ function createInstance(type: string, props: HostConfig['props'], root: RootStor
   if (props.args !== undefined && !Array.isArray(props.args)) throw new Error('R3F: The args prop must be an array!')
 
   // Create instance
-  const instance = prepare(props.object, root, type, props)
+  const object = props.object ?? new target(...(props.args ?? []))
+  const instance = prepare(object, root, type, props)
+
+  // Auto-attach geometries and materials
+  if (instance.props.attach === undefined) {
+    if (instance.object instanceof THREE.BufferGeometry) instance.props.attach = 'geometry'
+    else if (instance.object instanceof THREE.Material) instance.props.attach = 'material'
+  }
+
+  // Set initial props
+  applyProps(instance.object, props)
 
   return instance
 }
 
 // https://github.com/facebook/react/issues/20271
 // This will make sure events and attach are only handled once when trees are complete
-function handleContainerEffects(parent: Instance, child: Instance, beforeChild?: Instance, replace: boolean = false) {
+function handleContainerEffects(parent: Instance, child: Instance) {
   // Bail if tree isn't mounted or parent is not a container.
   // This ensures that the tree is finalized and React won't discard results to Suspense
   const state = child.root.getState()
   if (!parent.parent && parent.object !== state.scene) return
 
-  // Create & link object on first run
-  if (!child.object) {
-    // Get target from catalogue
-    const name = `${child.type[0].toUpperCase()}${child.type.slice(1)}`
-    const target = catalogue[name]
-
-    // Create object
-    child.object = child.props.object ?? new target(...(child.props.args ?? []))
-    child.object.__r3f = child
-
-    // Set initial props
-    applyProps(child.object, child.props)
+  // Handle interactivity
+  if (child.eventCount > 0 && child.object.raycast !== null && isObject3D(child.object)) {
+    state.internal.interaction.push(child.object)
   }
 
-  // Append instance
-  if (child.props.attach) {
-    attach(parent, child)
-  } else if (isObject3D(child.object) && isObject3D(parent.object)) {
-    if (beforeChild) {
-      child.object.parent = parent.object
-      parent.object.children.splice(parent.object.children.indexOf(beforeChild.object), replace ? 1 : 0, child.object)
-      child.object.dispatchEvent({ type: 'added' })
-    } else {
-      parent.object.add(child.object)
-    }
-  }
-
-  // Link subtree
+  // Handle attach
+  if (child.props.attach) attach(parent, child)
   for (const childInstance of child.children) handleContainerEffects(child, childInstance)
-
-  // Tree was updated, request a frame
-  invalidateInstance(child)
 }
 
 function appendChild(parent: HostConfig['instance'], child: HostConfig['instance'] | HostConfig['textInstance']) {
@@ -147,8 +133,16 @@ function appendChild(parent: HostConfig['instance'], child: HostConfig['instance
   child.parent = parent
   parent.children.push(child)
 
+  // Add Object3Ds if able
+  if (!child.props.attach && isObject3D(parent.object) && isObject3D(child.object)) {
+    parent.object.add(child.object)
+  }
+
   // Attach tree once complete
   handleContainerEffects(parent, child)
+
+  // Tree was updated, request a frame
+  invalidateInstance(child)
 }
 
 function insertBefore(
@@ -165,8 +159,18 @@ function insertBefore(
   if (childIndex !== -1) parent.children.splice(childIndex, replace ? 1 : 0, child)
   if (replace) beforeChild.parent = null
 
+  // Manually splice Object3Ds
+  if (!child.props.attach && isObject3D(parent.object) && isObject3D(child.object) && isObject3D(beforeChild.object)) {
+    child.object.parent = parent.object
+    parent.object.children.splice(parent.object.children.indexOf(beforeChild.object), replace ? 1 : 0, child.object)
+    child.object.dispatchEvent({ type: 'added' })
+  }
+
   // Attach tree once complete
-  handleContainerEffects(parent, child, beforeChild, replace)
+  handleContainerEffects(parent, child)
+
+  // Tree was updated, request a frame
+  invalidateInstance(child)
 }
 
 function removeChild(
@@ -257,15 +261,15 @@ function switchInstance(
   // This evil hack switches the react-internal fiber node
   // https://github.com/facebook/react/issues/14983
   // https://github.com/facebook/react/pull/15021
-  for (const _fiber of [fiber, fiber.alternate]) {
-    if (_fiber !== null) {
-      _fiber.stateNode = newInstance
-      if (_fiber.ref) {
-        if (typeof _fiber.ref === 'function') _fiber.ref(newInstance.object)
-        else _fiber.ref.current = newInstance.object
+  ;[fiber, fiber.alternate].forEach((fiber) => {
+    if (fiber !== null) {
+      fiber.stateNode = newInstance
+      if (fiber.ref) {
+        if (typeof fiber.ref === 'function') fiber.ref(newInstance.object)
+        else fiber.ref.current = newInstance.object
       }
     }
-  }
+  })
 
   // Tree was updated, request a frame
   invalidateInstance(newInstance)
