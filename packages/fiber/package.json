@@ -1,6 +1,6 @@
 {
-  "name": "@react-three/fiber",
-  "version": "9.0.0-alpha.2",
+  "name": "@nicetouch/react-three-fiber",
+  "version": "9.0.0-alpha.2--nt.9.20",
   "description": "A React renderer for Threejs",
   "keywords": [
     "react",
@@ -27,8 +27,8 @@
     "type": "opencollective",
     "url": "https://opencollective.com/react-three-fiber"
   },
-  "main": "dist/react-three-fiber.cjs.js",
-  "module": "dist/react-three-fiber.esm.js",
+  "main": "dist/nicetouch-react-three-fiber.cjs.js",
+  "module": "dist/nicetouch-react-three-fiber.esm.js",
   "types": "dist/react-three-fiber.cjs.d.ts",
   "react-native": "native/dist/react-three-fiber-native.cjs.js",
   "sideEffects": false,
