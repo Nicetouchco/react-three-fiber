@@ -364,7 +364,7 @@ export function createRoot<TCanvas extends Canvas>(canvas: TCanvas): ReconcilerR
       applyProps(
         gl as any,
         {
-          outputEncoding: linear ? LinearEncoding : sRGBEncoding,
+          outputColorSpace: linear ? LinearEncoding : sRGBEncoding,
           toneMapping: flat ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping,
         } as Partial<Properties<THREE.WebGLRenderer>>,
       )
