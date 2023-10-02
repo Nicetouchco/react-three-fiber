@@ -359,12 +359,12 @@ export function createRoot<TCanvas extends Canvas>(canvas: TCanvas): ReconcilerR
       }
 
       // Set color space and tonemapping preferences
-      const LinearEncoding = 3000
-      const sRGBEncoding = 3001
+      const LinearSRGBColorSpace = 'srgb-linear'
+      const sRGBColorSpace = 'srgb'
       applyProps(
         gl as any,
         {
-          outputColorSpace: linear ? LinearEncoding : sRGBEncoding,
+          outputColorSpace: linear ? LinearSRGBColorSpace : sRGBColorSpace,
           toneMapping: flat ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping,
         } as Partial<Properties<THREE.WebGLRenderer>>,
       )
