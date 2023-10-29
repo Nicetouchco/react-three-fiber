@@ -1,77 +1,115 @@
 import * as THREE from 'three'
-import { Image } from 'react-native'
+import { Image, NativeModules, Platform } from 'react-native'
 import { Asset } from 'expo-asset'
 import * as fs from 'expo-file-system'
 import { fromByteArray } from 'base64-js'
+import { Buffer } from 'buffer'
+
+// http://stackoverflow.com/questions/105034
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0,
+      v = c == 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+async function getAsset(input: string | number): Promise<string> {
+  if (typeof input === 'string') {
+    // Don't process storage
+    if (input.startsWith('file:')) return input
+
+    // Unpack Blobs from react-native BlobManager
+    // https://github.com/facebook/react-native/issues/22681#issuecomment-523258955
+    if (input.startsWith('blob:') || input.startsWith(NativeModules.BlobModule?.BLOB_URI_SCHEME)) {
+      const blob = await new Promise<Blob>((res, rej) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('GET', input as string)
+        xhr.responseType = 'blob'
+        xhr.onload = () => res(xhr.response)
+        xhr.onerror = rej
+        xhr.send()
+      })
+
+      const data = await new Promise<string>((res, rej) => {
+        const reader = new FileReader()
+        reader.onload = () => res(reader.result as string)
+        reader.onerror = rej
+        reader.readAsText(blob)
+      })
+
+      input = `data:${blob.type};base64,${data}`
+    }
+
+    // Create safe URI for JSI serialization
+    if (input.startsWith('data:')) {
+      const [header, data] = input.split(';base64,')
+      const [, type] = header.split('/')
+
+      const uri = fs.cacheDirectory + uuidv4() + `.${type}`
+      await fs.writeAsStringAsync(uri, data, { encoding: fs.EncodingType.Base64 })
+
+      return uri
+    }
+  }
+
+  // Download bundler module or external URL
+  const asset = await Asset.fromModule(input).downloadAsync()
+  let uri = asset.localUri || asset.uri
+
+  // Unpack assets in Android Release Mode
+  if (!uri.includes(':')) {
+    const file = `${fs.cacheDirectory}ExponentAsset-${asset.hash}.${asset.type}`
+    await fs.copyAsync({ from: uri, to: file })
+    uri = file
+  }
+
+  return uri
+}
 
 export function polyfills() {
-  // Patch Blob for ArrayBuffer if unsupported
-  try {
-    new Blob([new ArrayBuffer(4) as any])
-  } catch (_) {
-    global.Blob = class extends Blob {
-      constructor(parts?: any[], options?: any) {
-        super(
-          parts?.map((part) => {
-            if (part instanceof ArrayBuffer || ArrayBuffer.isView(part)) {
-              part = fromByteArray(new Uint8Array(part as ArrayBuffer))
-            }
+  // Patch Blob for ArrayBuffer and URL if unsupported
+  // https://github.com/facebook/react-native/pull/39276
+  // https://github.com/pmndrs/react-three-fiber/issues/3058
+  if (Platform.OS !== 'web') {
+    try {
+      const blob = new Blob([new ArrayBuffer(4) as any])
+      const url = URL.createObjectURL(blob)
+      URL.revokeObjectURL(url)
+    } catch (_) {
+      const BlobManager = require('react-native/Libraries/Blob/BlobManager.js')
 
-            return part
-          }),
-          options,
-        )
+      const createObjectURL = URL.createObjectURL
+      URL.createObjectURL = function (blob: Blob): string {
+        if ((blob as any).data._base64) {
+          return `data:${blob.type};base64,${(blob as any).data._base64}`
+        }
+
+        return createObjectURL(blob)
       }
-    }
-  }
 
-  function uuidv4() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0,
-        v = c == 'x' ? r : (r & 0x3) | 0x8
-      return v.toString(16)
-    })
-  }
+      const createFromParts = BlobManager.createFromParts
+      BlobManager.createFromParts = function (parts: Array<Blob | BlobPart | string>, options: any) {
+        parts = parts.map((part) => {
+          if (part instanceof ArrayBuffer || ArrayBuffer.isView(part)) {
+            part = fromByteArray(new Uint8Array(part as ArrayBuffer))
+          }
 
-  async function getAsset(input: string | number): Promise<string> {
-    if (typeof input === 'string') {
-      // Don't process storage or data uris
-      if (input.startsWith('file:') || input.startsWith('data:')) return input
-
-      // Unpack Blobs from react-native BlobManager
-      if (input.startsWith('blob:')) {
-        const blob = await new Promise<Blob>((res, rej) => {
-          const xhr = new XMLHttpRequest()
-          xhr.open('GET', input as string)
-          xhr.responseType = 'blob'
-          xhr.onload = () => res(xhr.response)
-          xhr.onerror = rej
-          xhr.send()
+          return part
         })
 
-        const data = await new Promise<string>((res, rej) => {
-          const reader = new FileReader()
-          reader.onload = () => res(reader.result as string)
-          reader.onerror = rej
-          reader.readAsText(blob)
-        })
+        const blob = createFromParts(parts, options)
 
-        return `data:${blob.type};base64,${data}`
+        if (!NativeModules.BlobModule?.BLOB_URI_SCHEME) {
+          blob.data._base64 = ''
+          for (const part of parts) {
+            blob.data._base64 += (part as any).data?._base64 ?? part
+          }
+        }
+
+        return blob
       }
     }
-
-    // Download bundler module or external URL
-    const asset = await Asset.fromModule(input).downloadAsync()
-    let uri = asset.localUri || asset.uri
-
-    // Unpack assets in Android Release Mode
-    if (!uri.includes(':')) {
-      const file = `${fs.cacheDirectory}ExponentAsset-${asset.hash}.${asset.type}`
-      await fs.copyAsync({ from: uri, to: file })
-      uri = file
-    }
-
-    return uri
   }
 
   // Don't pre-process urls, let expo-asset generate an absolute URL
@@ -79,36 +117,28 @@ export function polyfills() {
   THREE.LoaderUtils.extractUrlBase = (url: string) => (typeof url === 'string' ? extractUrlBase(url) : './')
 
   // There's no Image in native, so create a data texture instead
-  THREE.TextureLoader.prototype.load = function load(url, onLoad, onProgress, onError) {
-    if (this.path) url = this.path + url
+  THREE.TextureLoader.prototype.load = function load(this: THREE.TextureLoader, url, onLoad, onProgress, onError) {
+    if (this.path && typeof url === 'string') url = this.path + url
 
     const texture = new THREE.Texture()
 
     getAsset(url)
       .then(async (uri) => {
-        // Create safe URI for JSI
-        if (uri.startsWith('data:')) {
-          const [header, data] = uri.split(',')
-          const [, type] = header.split('/')
-
-          uri = fs.cacheDirectory + uuidv4() + `.${type}`
-          await fs.writeAsStringAsync(uri, data, { encoding: fs.EncodingType.Base64 })
-        }
-
+        // https://github.com/expo/expo-three/pull/266
         const { width, height } = await new Promise<{ width: number; height: number }>((res, rej) =>
           Image.getSize(uri, (width, height) => res({ width, height }), rej),
         )
 
         texture.image = {
+          // Special case for EXGLImageUtils::loadImage
           data: { localUri: uri },
           width,
           height,
         }
-        texture.flipY = true
-        texture.unpackAlignment = 1
+        texture.flipY = true // Since expo-gl@12.4.0
         texture.needsUpdate = true
 
-        // Force non-DOM upload for EXGL fast paths
+        // Force non-DOM upload for EXGL texImage2D
         // @ts-ignore
         texture.isDataTexture = true
 
@@ -119,82 +149,24 @@ export function polyfills() {
     return texture
   }
 
-  // Fetches assets via XMLHttpRequest
-  THREE.FileLoader.prototype.load = function load(url, onLoad, onProgress, onError) {
-    if (this.path) url = this.path + url
+  // Fetches assets via FS
+  THREE.FileLoader.prototype.load = function load(this: THREE.FileLoader, url, onLoad, onProgress, onError) {
+    if (this.path && typeof url === 'string') url = this.path + url
 
-    const request = new XMLHttpRequest()
+    this.manager.itemStart(url)
 
     getAsset(url)
       .then(async (uri) => {
-        // Make FS paths web-safe
-        if (uri.startsWith('file://')) {
-          const data = await fs.readAsStringAsync(uri, { encoding: fs.EncodingType.Base64 })
-          uri = `data:application/octet-stream;base64,${data}`
-        }
-
-        request.open('GET', uri, true)
-
-        request.addEventListener(
-          'load',
-          (event) => {
-            if (request.status === 200) {
-              onLoad?.(request.response)
-
-              this.manager.itemEnd(url)
-            } else {
-              onError?.(event as unknown as ErrorEvent)
-
-              this.manager.itemError(url)
-              this.manager.itemEnd(url)
-            }
-          },
-          false,
-        )
-
-        request.addEventListener(
-          'progress',
-          (event) => {
-            onProgress?.(event)
-          },
-          false,
-        )
-
-        request.addEventListener(
-          'error',
-          (event) => {
-            onError?.(event as unknown as ErrorEvent)
-
-            this.manager.itemError(url)
-            this.manager.itemEnd(url)
-          },
-          false,
-        )
-
-        request.addEventListener(
-          'abort',
-          (event) => {
-            onError?.(event as unknown as ErrorEvent)
-
-            this.manager.itemError(url)
-            this.manager.itemEnd(url)
-          },
-          false,
-        )
-
-        if (this.responseType) request.responseType = this.responseType
-        if (this.withCredentials) request.withCredentials = this.withCredentials
-
-        for (const header in this.requestHeader) {
-          request.setRequestHeader(header, this.requestHeader[header])
-        }
-
-        request.send(null)
-
-        this.manager.itemStart(url)
+        const base64 = await fs.readAsStringAsync(uri, { encoding: fs.EncodingType.Base64 })
+        const data = Buffer.from(base64, 'base64')
+        onLoad?.(data.buffer)
       })
-      .catch(onError)
-
-    return request
+      .catch((error) => {
+        onError?.(error)
+        this.manager.itemError(url)
+      })
+      .finally(() => {
+        this.manager.itemEnd(url)
+      })
   }
 }
